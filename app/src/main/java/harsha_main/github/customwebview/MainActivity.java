@@ -50,6 +50,7 @@ public class MainActivity extends Activity {
     Button but;
     ProcessZipfile mew;
     String device_id;
+    private static final int PICK_HTML_FILE = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,9 +74,9 @@ public class MainActivity extends Activity {
         but.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                mew.execute(Url);
-                progressBar.setVisibility(View.VISIBLE);
-                but.setVisibility(View.GONE);
+                openHtmlFilePicker();
+             // progressBar.setVisibility(View.VISIBLE);
+        //  but.setVisibility(View.GONE);
                 Animator animator = null;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     animator = ViewAnimationUtils.createCircularReveal(getWindow().getDecorView(), getWindow().getDecorView().getWidth() / 2, getWindow().getDecorView().getHeight() / 2, 0, 500);
@@ -196,7 +197,7 @@ public class MainActivity extends Activity {
             webView.setVisibility(View.VISIBLE);
             webView.getSettings().setJavaScriptEnabled(true);
             Log.e("base", base + directory + "/First-Aid Kit.html");
-            webView.loadUrl("file:///" + base + directory + "/First-Aid Kit.html");
+            //webView.loadUrl("file:///" + base + directory + "/First-Aid Kit.html");
             Animator animator = null;
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                 animator = ViewAnimationUtils.createCircularReveal(getWindow().getDecorView(), getWindow().getDecorView().getWidth() / 2, getWindow().getDecorView().getHeight() / 2, 500, 0);
@@ -204,4 +205,19 @@ public class MainActivity extends Activity {
             }
         }
     }
+        private void openHtmlFilePicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/html");
+        startActivityForResult(intent, PICK_HTML_FILE);
+    }
+    @Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+
+    if (requestCode == PICK_HTML_FILE && resultCode == RESULT_OK && data != null) {
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.loadUrl(data.getData().toString());
+    }
+}
 }
