@@ -1,3 +1,5 @@
+# File: app/src/main/java/harsha_main/github/customwebview/MainActivity.java
+
 package harsha_main.github.customwebview;
 
 
@@ -10,6 +12,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -19,7 +22,12 @@ import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewAnimationUtils;
+import android.webkit.ConsoleMessage;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+import android.webkit.WebSettings;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -40,95 +48,268 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
+
     final String Url = "https://drive.google.com/uc?export=download&id=1oPmin1dmKGsEzCRNiZ_o2Bbg7uicKhU7";
+
     String base = Environment.getExternalStorageDirectory().toString();
     String filename = "/Webfiles.zip";
     String directory = "/newdir";
     String StorezipFileLocation = base + directory + filename;
+
     WebView webView;
     ProgressBar progressBar;
     Button but;
     ProcessZipfile mew;
     String device_id;
+
     private static final int PICK_HTML_FILE = 100;
+    private static final int FILE_CHOOSER_REQUEST = 101;
+
+    private ValueCallback<Uri[]> filePathCallback;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
+
         webView = findViewById(R.id.web);
         but = findViewById(R.id.button);
         progressBar = findViewById(R.id.progressBar);
 
-        if (Build.VERSION.SDK_INT >= 23) {
-            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    == PackageManager.PERMISSION_GRANTED) {
-            } else {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-            }
-        }
-        device_id = Settings.Secure.getString(getContentResolver(),
-                Settings.Secure.ANDROID_ID);
-        new File(base + directory).mkdirs();
-        mew = new ProcessZipfile();
-        but.setOnClickListener(new View.OnClickListener() {
+
+        /*
+         * WebView settings
+         */
+        WebSettings settings = webView.getSettings();
+
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+
+        settings.setSupportMultipleWindows(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+
+        /*
+         * Keep links and local HTML inside this WebView.
+         */
+        webView.setWebViewClient(new WebViewClient());
+
+
+        /*
+         * WebChromeClient
+         *
+         * Enables:
+         * 1. <input type="file">
+         * 2. JavaScript alert()
+         * 3. JavaScript confirm()
+         * 4. JavaScript prompt()
+         * 5. console.log()
+         */
+        webView.setWebChromeClient(new WebChromeClient() {
+
             @Override
-            public void onClick(View view) {
-                openHtmlFilePicker();
-             // progressBar.setVisibility(View.VISIBLE);
-        //  but.setVisibility(View.GONE);
-                Animator animator = null;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    animator = ViewAnimationUtils.createCircularReveal(getWindow().getDecorView(), getWindow().getDecorView().getWidth() / 2, getWindow().getDecorView().getHeight() / 2, 0, 500);
-                    animator.start();
+            public boolean onShowFileChooser(
+                    WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
+
+                MainActivity.this.filePathCallback = filePathCallback;
+
+                try {
+                    Intent intent = fileChooserParams.createIntent();
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                    return true;
+
+                } catch (Exception e) {
+                    MainActivity.this.filePathCallback = null;
+                    return false;
                 }
-                Toast.makeText(MainActivity.this, "getting data", Toast.LENGTH_SHORT).show();
+            }
+
+
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+
+                Log.d(
+                        "WebViewConsole",
+                        consoleMessage.message()
+                                + " -- line "
+                                + consoleMessage.lineNumber()
+                                + " of "
+                                + consoleMessage.sourceId()
+                );
+
+                return true;
             }
         });
 
+
+        /*
+         * Storage permission for older Android versions.
+         */
+        if (Build.VERSION.SDK_INT >= 23) {
+
+            if (checkSelfPermission(
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED) {
+
+            } else {
+
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        1
+                );
+            }
+        }
+
+
+        device_id = Settings.Secure.getString(
+                getContentResolver(),
+                Settings.Secure.ANDROID_ID
+        );
+
+
+        new File(base + directory).mkdirs();
+
+        mew = new ProcessZipfile();
+
+
+        /*
+         * Get WebPage button
+         */
+        but.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View view) {
+
+                openHtmlFilePicker();
+
+                // progressBar.setVisibility(View.VISIBLE);
+                // but.setVisibility(View.GONE);
+
+                Animator animator = null;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+
+                    animator = ViewAnimationUtils.createCircularReveal(
+                            getWindow().getDecorView(),
+                            getWindow().getDecorView().getWidth() / 2,
+                            getWindow().getDecorView().getHeight() / 2,
+                            0,
+                            500
+                    );
+
+                    animator.start();
+                }
+
+                Toast.makeText(
+                        MainActivity.this,
+                        "getting data",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        });
     }
 
+
+    /*
+     * Network check
+     */
     protected void onResume() {
+
         super.onResume();
+
         if (isNetworkConnected()) {
             return;
         }
-        Toast.makeText(this, "Check your internet and try again", Toast.LENGTH_SHORT).show();
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setMessage("You need internet connection for this app. Please turn on mobile network or Wi-Fi in Settings.")
-                .setTitle("Unable to connect to Internet").setCancelable(false)
-                .setPositiveButton("Settings", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        // Open the settings
-                        startActivity(new Intent("android.settings.SETTINGS"));
-                    }
-                })
-                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        //close activity in case of no connection
-                        MainActivity.this.finish();
-                    }
-                });
+
+        Toast.makeText(
+                this,
+                "Check your internet and try again",
+                Toast.LENGTH_SHORT
+        ).show();
+
+
+        AlertDialog.Builder builder =
+                new AlertDialog.Builder(this);
+
+        builder.setMessage(
+                        "You need internet connection for this app. Please turn on mobile network or Wi-Fi in Settings."
+                )
+                .setTitle("Unable to connect to Internet")
+                .setCancelable(false)
+
+                .setPositiveButton(
+                        "Settings",
+                        new DialogInterface.OnClickListener() {
+
+                            public void onClick(
+                                    DialogInterface dialog,
+                                    int id) {
+
+                                startActivity(
+                                        new Intent(
+                                                "android.settings.SETTINGS"
+                                        )
+                                );
+                            }
+                        }
+                )
+
+                .setNegativeButton(
+                        "Cancel",
+                        new DialogInterface.OnClickListener() {
+
+                            public void onClick(
+                                    DialogInterface dialog,
+                                    int id) {
+
+                                MainActivity.this.finish();
+                            }
+                        }
+                );
+
         builder.create().show();
     }
 
+
     private boolean isNetworkConnected() {
-        return ((ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo() != null;
+
+        return (
+                (ConnectivityManager)
+                        getSystemService(Context.CONNECTIVITY_SERVICE)
+        ).getActiveNetworkInfo() != null;
     }
 
+
+    /*
+     * Original ZIP downloader
+     */
     class ProcessZipfile extends AsyncTask<String, String, String> {
 
         @Override
         protected String doInBackground(String... aurl) {
+
             int count;
 
             try {
+
                 URL url = new URL(aurl[0]);
+
                 URLConnection connection = url.openConnection();
                 connection.connect();
-                InputStream input = new BufferedInputStream(url.openStream());
 
-                OutputStream output = new FileOutputStream(StorezipFileLocation);
+                InputStream input =
+                        new BufferedInputStream(url.openStream());
+
+                OutputStream output =
+                        new FileOutputStream(StorezipFileLocation);
 
                 byte data[] = new byte[8192];
 
@@ -136,88 +317,281 @@ public class MainActivity extends Activity {
 
                     output.write(data, 0, count);
                 }
+
                 output.close();
                 input.close();
 
-                //download finished
                 extractZip();
 
                 modifyhtml();
 
             } catch (Exception e) {
+
             }
+
             return null;
         }
 
 
         void extractZip() throws Exception {
-            //start decompressing
+
             int BUFFER_SIZE = 4096;
-            String zipFilePath = base + directory + filename;
-            String destDirectory = base + directory;
-            ZipInputStream zipIn = new ZipInputStream(new FileInputStream(zipFilePath));
+
+            String zipFilePath =
+                    base + directory + filename;
+
+            String destDirectory =
+                    base + directory;
+
+            ZipInputStream zipIn =
+                    new ZipInputStream(
+                            new FileInputStream(zipFilePath)
+                    );
+
+
             while (true) {
-                ZipEntry entry = zipIn.getNextEntry();
-                if (entry == null) break;
-                String filePath = destDirectory + File.separator + entry.getName();
+
+                ZipEntry entry =
+                        zipIn.getNextEntry();
+
+                if (entry == null) {
+                    break;
+                }
+
+
+                String filePath =
+                        destDirectory
+                                + File.separator
+                                + entry.getName();
+
+
                 if (!entry.isDirectory()) {
-                    // if the entry is a file, extract it
-                    BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath));
-                    byte[] bytesIn = new byte[BUFFER_SIZE];
+
+                    BufferedOutputStream bos =
+                            new BufferedOutputStream(
+                                    new FileOutputStream(filePath)
+                            );
+
+                    byte[] bytesIn =
+                            new byte[BUFFER_SIZE];
+
                     int read = 0;
+
                     while ((read = zipIn.read(bytesIn)) != -1) {
-                        bos.write(bytesIn, 0, read);
+
+                        bos.write(
+                                bytesIn,
+                                0,
+                                read
+                        );
                     }
+
                     bos.close();
+
                 } else {
-                    //else, create the directory
-                    File dir = new File(filePath);
+
+                    File dir =
+                            new File(filePath);
+
                     dir.mkdir();
                 }
+
                 zipIn.closeEntry();
             }
+
             zipIn.close();
         }
 
+
         void modifyhtml() throws Exception {
-            //create a new html file which displays Device Id
 
-            String content = "document.write(\"Device id: " + device_id + "\")";
+            String content =
+                    "document.write(\"Device id: "
+                            + device_id
+                            + "\")";
 
-            Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(base + directory + "/First-Aid Kit_files/device.js")));
+
+            Writer writer =
+                    new BufferedWriter(
+                            new OutputStreamWriter(
+                                    new FileOutputStream(
+                                            base
+                                                    + directory
+                                                    + "/First-Aid Kit_files/device.js"
+                                    )
+                            )
+                    );
+
+
             writer.write(content);
             writer.close();
         }
 
+
         @Override
         protected void onPostExecute(String s) {
+
             super.onPostExecute(s);
-            Toast.makeText(MainActivity.this, "Finished", Toast.LENGTH_LONG).show();
+
+            Toast.makeText(
+                    MainActivity.this,
+                    "Finished",
+                    Toast.LENGTH_LONG
+            ).show();
+
             progressBar.setVisibility(View.GONE);
+
             webView.setVisibility(View.VISIBLE);
+
             webView.getSettings().setJavaScriptEnabled(true);
-            Log.e("base", base + directory + "/First-Aid Kit.html");
-            //webView.loadUrl("file:///" + base + directory + "/First-Aid Kit.html");
+
+            Log.e(
+                    "base",
+                    base
+                            + directory
+                            + "/First-Aid Kit.html"
+            );
+
+            // Original automatic loading disabled.
+            // webView.loadUrl(
+            //        "file:///"
+            //        + base
+            //        + directory
+            //        + "/First-Aid Kit.html"
+            // );
+
+
             Animator animator = null;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                animator = ViewAnimationUtils.createCircularReveal(getWindow().getDecorView(), getWindow().getDecorView().getWidth() / 2, getWindow().getDecorView().getHeight() / 2, 500, 0);
+
+            if (android.os.Build.VERSION.SDK_INT
+                    >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+
+                animator =
+                        ViewAnimationUtils.createCircularReveal(
+                                getWindow().getDecorView(),
+                                getWindow().getDecorView().getWidth() / 2,
+                                getWindow().getDecorView().getHeight() / 2,
+                                500,
+                                0
+                        );
+
                 animator.start();
             }
         }
     }
-        private void openHtmlFilePicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/html");
-        startActivityForResult(intent, PICK_HTML_FILE);
-    }
-    @Override
-protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-    super.onActivityResult(requestCode, resultCode, data);
 
-    if (requestCode == PICK_HTML_FILE && resultCode == RESULT_OK && data != null) {
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.loadUrl(data.getData().toString());
+
+    /*
+     * Android file picker for the Get WebPage button.
+     */
+    private void openHtmlFilePicker() {
+
+        Intent intent =
+                new Intent(Intent.ACTION_OPEN_DOCUMENT);
+
+        intent.addCategory(
+                Intent.CATEGORY_OPENABLE
+        );
+
+        intent.setType("text/html");
+
+        startActivityForResult(
+                intent,
+                PICK_HTML_FILE
+        );
     }
-}
+
+
+    /*
+     * Android Back button.
+     *
+     * If the WebView has browsing history,
+     * go back inside the WebView.
+     */
+    @Override
+    public void onBackPressed() {
+
+        if (webView != null && webView.canGoBack()) {
+
+            webView.goBack();
+
+        } else {
+
+            super.onBackPressed();
+        }
+    }
+
+
+    /*
+     * Results from both file pickers.
+     */
+    @Override
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data) {
+
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data
+        );
+
+
+        /*
+         * Get WebPage button.
+         */
+        if (requestCode == PICK_HTML_FILE) {
+
+            if (resultCode == RESULT_OK
+                    && data != null
+                    && data.getData() != null) {
+
+                Uri uri = data.getData();
+
+                webView.getSettings()
+                        .setJavaScriptEnabled(true);
+
+                webView.loadUrl(
+                        uri.toString()
+                );
+            }
+
+            return;
+        }
+
+
+        /*
+         * <input type="file">
+         */
+        if (requestCode == FILE_CHOOSER_REQUEST) {
+
+            if (filePathCallback == null) {
+                return;
+            }
+
+
+            Uri[] results = null;
+
+
+            if (resultCode == RESULT_OK
+                    && data != null) {
+
+                Uri uri = data.getData();
+
+                if (uri != null) {
+
+                    results =
+                            new Uri[]{uri};
+                }
+            }
+
+
+            filePathCallback.onReceiveValue(
+                    results
+            );
+
+            filePathCallback = null;
+        }
+    }
 }
